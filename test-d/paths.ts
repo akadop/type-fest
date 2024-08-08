@@ -1,5 +1,5 @@
-import {expectAssignable, expectType} from 'tsd';
-import type {Paths, PickDeep} from '../index';
+import {expectAssignable, expectNotAssignable, expectType} from 'tsd';
+import type {Paths} from '../index';
 
 declare const normal: Paths<{foo: string}>;
 expectType<'foo'>(normal);
@@ -108,3 +108,41 @@ type MyOtherEntity = {
 };
 type MyEntityPaths = Paths<MyEntity>;
 expectAssignable<string>({} as MyEntityPaths);
+
+// By default, the recursion limit should be reasonably long
+type RecursiveFoo = {foo: RecursiveFoo};
+expectAssignable<Paths<RecursiveFoo>>('foo.foo.foo.foo.foo.foo.foo.foo');
+
+declare const recursion0: Paths<RecursiveFoo, {maxRecursionDepth: 0}>;
+expectType<'foo'>(recursion0);
+
+declare const recursion1: Paths<RecursiveFoo, {maxRecursionDepth: 1}>;
+expectType<'foo' | 'foo.foo'>(recursion1);
+
+// Test a[0].b style
+type Object1 = {
+	arr: [{a: string}];
+};
+expectType<Paths<Object1, {bracketNotation: true}>>({} as 'arr' | 'arr[0]' | 'arr[0].a');
+
+type Object2 = {
+	arr: Array<{a: string}>;
+	arr1: string[];
+};
+expectType<Paths<Object2, {bracketNotation: true}>>({} as 'arr' | 'arr1' | `arr[${number}]` | `arr[${number}].a` | `arr1[${number}]`);
+
+type Object3 = {
+	1: 'foo';
+	'2': 'bar';
+};
+expectType<Paths<Object3, {bracketNotation: true}>>({} as '[1]' | '[2]');
+
+type deepArray = {
+	arr: Array<Array<Array<{a: string}>>>;
+};
+expectType<Paths<deepArray, {bracketNotation: true}>>({} as 'arr' | `arr[${number}]` | `arr[${number}][${number}]` | `arr[${number}][${number}][${number}]` | `arr[${number}][${number}][${number}].a`);
+
+type RecursionArray = RecursionArray[];
+type RecursionArrayPaths = Paths<RecursionArray, {bracketNotation: true; maxRecursionDepth: 3}>;
+expectAssignable<RecursionArrayPaths>({} as `[${number}][${number}][${number}][${number}]`);
+expectNotAssignable<RecursionArrayPaths>({} as `[${number}][${number}][${number}][${number}][${number}]`);
